@@ -54,7 +54,7 @@ def welcome():
 @app.route('/api/v1.0/precipitation')
 def precipitation():
     # Dates and precipitation values
-    results = session.query(Measurement.date, Measurement.prcp).order_by(Measurement.date).all()
+    results = session.query(Measurement.date, Measurement.prcp).all()
     prcp_date = dict(results)
 
     #jsonify result
@@ -65,24 +65,27 @@ def precipitation():
 @app.route('/api/v1.0/stations')
 def stations():
     #All stations
-    new_station = session.query(func.distinct(Station.station).all()
+    station = session.query(Station.name).all()
+    station_list = list(np.ravel(station))
     #jsonify result
-    return jsonify(new_station)
+    return jsonify(station_list)
 
 
 #Temperature Observations
 @app.route('/api/v1.0/tobs')
 def tobs():
-   
-    #get last date from year ago
-    one_year_ago = dt.date(2017,8,23) - dt.timedelta(days=365)              
-                                
-    #date and temperature
-    this_station = session.query(Measurement.date,Measurement.tobs).filter(Measurement.date > one_year_ago).filter(Measurement.station == 'USC00519281').all()
-    station_list = list(this_station)
+
+    #recent date + date from one year ago
+    recent_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+    one_year_ago = (dt.datetime.strptime(recent_date[0],'%Y-%m-%d') - dt.timedelta(days=365)).strftime('%Y-%m-%d')
+    
+    #tobs
+    tobs_result = session.query(Measurement.date, Measurement.tobs).filter(Measurement.date > one_year_ago).all()
+    #make list
+    tobs_list = list(np.ravel(tobs_result))
     
     #jsonify
-    return jsonify(station_list)
+    return jsonify(tobs_list)
 
 
     
@@ -90,21 +93,33 @@ def tobs():
 #min, max, avg temp
 @app.route('/api/v1.0/<start>')
 def temp_start(start):
-    #start time
-    date1 = dt.datetime.strptime(start, '%Y-%m-%d')
-    one_year_ago2 = date1 - dt.timedelta(days=365)
-    #min, max, avg temp
-    low_temp = session.query(func.min(Measurement.tobs)).filter(Measurement.date > one_year_ago2).all()
-    high_temp = session.query(func.max(Measurement.tobs)).filter(Measurement.date > one_year_ago2).all()
-    avg_temp = session.query(func.avg(Measurement.tobs)).filter(Measurement.date > one_year_ago2).all()
+    
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+    start_date = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).filter(Measurement.date > start).all()
+    temp_start = list(np.ravel(start_date))
+    
+    return jsonify(temp_start)
+    
+
+    #trial and error
+#     #start time
+#     start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+#     one_year_ago2 = date1 - dt.timedelta(days=365)
+   
+#     #min, max, avg temp
+    
+#     low_temp = session.query(func.min(Measurement.tobs)).filter(Measurement.date > start_date).all()
+#     high_temp = session.query(func.max(Measurement.tobs)).filter(Measurement.date > start_date).all()
+#     avg_temp = session.query(func.avg(Measurement.tobs)).filter(Measurement.date > start_date).all()
 
     #jsonify
-    return jsonify(f"Date:{date1} : Minimum Temperature: {low_temp}, Maximum Temperature: {high_temp}, Average Temperature: {avg_temp}")
+    
+#     return jsonify(f"Date:{start_date} : Minimum Temperature: {low_temp}, Maximum Temperature: {high_temp}, Average Temperature: {avg_temp}")
     
 
 #Temps by Start-End Date
 @app.route('/api/v1.0/<start><end>')
-def temp_start_end():
+def temp_start_end(start,end):
     #start and end date
     date1 = dt.datetime.strptime(start, '%Y-%m-%d')
     date2 = dt.datetime.strptime(end, '%Y-%m-%d')
